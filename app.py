@@ -34,51 +34,27 @@ st.set_page_config(page_title="🌊 Oceanographic AI Assistant", layout="wide")
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# --- Custom CSS for floating mic button ---
-st.markdown("""
-    <style>
-    .mic-button {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        background-color: #0078ff;
-        border-radius: 50%;
-        width: 70px;
-        height: 70px;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        cursor: pointer;
-        z-index: 9999;
-    }
-    .mic-button:hover { background-color: #0056b3; }
-    .mic-button i { color: white; font-size: 30px; line-height: 70px; }
-    </style>
-    <div class="mic-button" onclick="startRecognition()">
-        <i>🎤</i>
-    </div>
-    <script>
-    function startRecognition() {
-        var recognition = new webkitSpeechRecognition();
-        recognition.lang = "en-US";
-        recognition.onresult = function(event) {
-            var userSpeech = event.results[0][0].transcript;
-            var inputBox = window.parent.document.querySelector('input[type="text"]');
-            inputBox.value = userSpeech;
-            inputBox.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        recognition.start();
-    }
-    </script>
-""", unsafe_allow_html=True)
-
-# --- Title ---
 st.title("🌊 Oceanographic AI Assistant")
-st.caption("Ask about **salinity**, **temperature**, or **ARGO floats** using voice 🎤 or text ⌨️.")
+st.caption("Ask about **salinity**, **temperature**, or **ARGO floats** using text or voice input 🎤.")
 
-# --- Text input fallback ---
-user_query = st.text_input("Type your query or click the 🎤 button:")
+# --- Voice Input using microphone ---
+voice_query = None
+if st.button("🎤 Speak your query"):
+    try:
+        import speech_recognition as sr
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            st.info("Listening for 5 seconds...")
+            audio_data = r.listen(source, timeout=5)
+            voice_query = r.recognize_google(audio_data)
+            st.success(f"🎤 You said: {voice_query}")
+    except Exception as e:
+        st.error(f"Could not recognize speech: {e}")
 
-# --- Handle query ---
+# --- User Input ---
+user_query = st.text_input("Type your query here:", value=voice_query if voice_query else "")
+
+# --- Process Query ---
 def process_query(query):
     response = ""
 
@@ -118,20 +94,20 @@ def process_query(query):
         st.warning(response)
         speak(response)
 
+    # Save to chat history
     st.session_state.history.append({"query": query, "response": response})
 
-# --- Run query if entered ---
+# --- Run query if submitted ---
 if user_query:
     process_query(user_query)
 
-# --- Chat history panel ---
-st.sidebar.title("💬 Chat History")
-if st.session_state.history:
-    for chat in st.session_state.history:
-        st.sidebar.markdown(f"**You:** {chat['query']}")
-        st.sidebar.markdown(f"**Bot:** {chat['response']}")
-else:
-    st.sidebar.info("No queries yet. Try asking something!")
+# --- Display Chat History ---
+st.subheader("💬 Chat History")
+for chat in st.session_state.history:
+    st.markdown(f"**You:** {chat['query']}")
+    st.markdown(f"**Bot:** {chat['response']}")
+    st.markdown("---")
+
 
 
 
