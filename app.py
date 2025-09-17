@@ -1,97 +1,134 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
 import random
-from datetime import datetime, timedelta
-from streamlit_chat import message
+import matplotlib.pyplot as plt
+import pandas as pd
+import sys
 
-# ---------------------------
-# Mock Dataset Generator
-# ---------------------------
-def generate_mock_data(param="salinity"):
-    days = pd.date_range(datetime.now() - timedelta(days=30), datetime.now(), freq="D")
-    values = [random.uniform(30, 40) if param=="salinity" else random.uniform(15, 30) for _ in days]
-    df = pd.DataFrame({"Date": days, "Value": values})
-    return df
+# --- TTS Setup ---
+try:
+    import pyttsx3
+    tts_mode = "local"
+except ImportError:
+    from gtts import gTTS
+    import os
+    tts_mode = "cloud"
 
-# ---------------------------
-# Mock ARGO Floats Locations
-# ---------------------------
-argo_floats = pd.DataFrame({
-    "FloatID": ["ARGO-1", "ARGO-2", "ARGO-3"],
-    "Lat": [0.5, 15.3, -8.6],
-    "Lon": [60.1, 72.5, 80.3],
-    "Region": ["Equator", "Arabian Sea", "Indian Ocean"]
-})
-
-# ---------------------------
-# Query Parser (Simple Keywords)
-# ---------------------------
-def parse_query(user_input):
-    query = user_input.lower()
-    if "salinity" in query:
-        return "salinity"
-    elif "temperature" in query or "temp" in query:
-        return "temperature"
-    elif "float" in query or "location" in query:
-        return "floats"
+def speak(text):
+    if tts_mode == "local":
+        engine = pyttsx3.init()
+        engine.say(text)
+        engine.runAndWait()
     else:
-        return "unknown"
+        tts = gTTS(text=text, lang='en')
+        tts.save("temp.mp3")
+        if sys.platform.startswith("win"):
+            os.system("start temp.mp3")
+        elif sys.platform.startswith("linux"):
+            os.system("mpg321 temp.mp3")
+        elif sys.platform.startswith("darwin"):
+            os.system("afplay temp.mp3")
 
-# ---------------------------
-# Streamlit App
-# ---------------------------
-st.set_page_config(page_title="Ocean AI Chatbot 🌊", layout="wide")
-st.title("🌊 Oceanographic AI Chatbot (Prototype)")
+# --- Streamlit Page Setup ---
+st.set_page_config(page_title="🌊 Oceanographic AI Assistant", layout="wide")
 
-# Initialize session state for chat
 if "history" not in st.session_state:
     st.session_state.history = []
-if "responses" not in st.session_state:
-    st.session_state.responses = []
-if "queries" not in st.session_state:
-    st.session_state.queries = []
 
-# Input field
-user_query = st.text_input("Type your question here and press Enter...")
+# --- Custom CSS for floating mic button ---
+st.markdown("""
+    <style>
+    .mic-button {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background-color: #0078ff;
+        border-radius: 50%;
+        width: 70px;
+        height: 70px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        cursor: pointer;
+        z-index: 9999;
+    }
+    .mic-button:hover { background-color: #0056b3; }
+    .mic-button i { color: white; font-size: 30px; line-height: 70px; }
+    </style>
+    <div class="mic-button" onclick="startRecognition()">
+        <i>🎤</i>
+    </div>
+    <script>
+    function startRecognition() {
+        var recognition = new webkitSpeechRecognition();
+        recognition.lang = "en-US";
+        recognition.onresult = function(event) {
+            var userSpeech = event.results[0][0].transcript;
+            var inputBox = window.parent.document.querySelector('input[type="text"]');
+            inputBox.value = userSpeech;
+            inputBox.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        recognition.start();
+    }
+    </script>
+""", unsafe_allow_html=True)
 
-if user_query:
-    # Add user query to history
-    st.session_state.queries.append(user_query)
-    
-    query_type = parse_query(user_query)
-    response_text = ""
-    graph = None
-    table = None
+# --- Title ---
+st.title("🌊 Oceanographic AI Assistant")
+st.caption("Ask about **salinity**, **temperature**, or **ARGO floats** using voice 🎤 or text ⌨️.")
 
-    if query_type in ["salinity", "temperature"]:
-        df = generate_mock_data(query_type)
-        response_text = f"Here is the {query_type} profile you asked for 🌊📊"
-        graph = px.line(df, x="Date", y="Value", title=f"{query_type.capitalize()} over Time")
+# --- Text input fallback ---
+user_query = st.text_input("Type your query or click the 🎤 button:")
 
-    elif query_type == "floats":
-        response_text = "Here are the ARGO floats near your region 🗺️"
-        graph = px.scatter_geo(
-            argo_floats,
-            lat="Lat", lon="Lon",
-            hover_name="FloatID",
-            text="Region",
-            projection="natural earth",
-            title="ARGO Floats Map"
-        )
-        table = argo_floats
+# --- Handle query ---
+def process_query(query):
+    response = ""
+
+    if "salinity" in query.lower():
+        st.subheader("📈 Salinity Profile")
+        data = [random.uniform(30, 40) for _ in range(12)]
+        plt.figure()
+        plt.plot(range(1, 13), data, marker="o")
+        plt.xlabel("Month")
+        plt.ylabel("Salinity (PSU)")
+        plt.title("Salinity Profile")
+        st.pyplot(plt)
+        response = "Here is the salinity profile for the selected region."
+        speak(response)
+
+    elif "temperature" in query.lower():
+        st.subheader("🌡️ Temperature Profile")
+        data = [random.uniform(20, 30) for _ in range(12)]
+        plt.figure()
+        plt.plot(range(1, 13), data, marker="o", color="red")
+        plt.xlabel("Month")
+        plt.ylabel("Temperature (°C)")
+        plt.title("Temperature Profile")
+        st.pyplot(plt)
+        response = "Here is the temperature profile for the selected region."
+        speak(response)
+
+    elif "float" in query.lower():
+        st.subheader("🌍 ARGO Floats Near Your Region")
+        df = pd.DataFrame({"lat": [10.0, 12.5, 15.0], "lon": [72.0, 75.5, 78.0]})
+        st.map(df)
+        response = "Here are the nearby ARGO floats on the map."
+        speak(response)
 
     else:
-        response_text = "🤔 Sorry, I couldn’t understand that. Try asking about **salinity, temperature, or floats.**"
+        response = "🤔 Sorry, I couldn’t understand that. Try asking about salinity, temperature, or floats."
+        st.warning(response)
+        speak(response)
 
-    st.session_state.responses.append((response_text, graph, table))
+    st.session_state.history.append({"query": query, "response": response})
 
-# Chat UI
-for i in range(len(st.session_state.queries)):
-    message(st.session_state.queries[i], is_user=True, key=f"user_{i}")
-    resp, graph, table = st.session_state.responses[i]
-    message(resp, is_user=False, key=f"bot_{i}")
-    if graph:
-        st.plotly_chart(graph, use_container_width=True)
-    if table is not None:
-        st.dataframe(table)
+# --- Run query if entered ---
+if user_query:
+    process_query(user_query)
+
+# --- Chat history panel ---
+st.sidebar.title("💬 Chat History")
+if st.session_state.history:
+    for chat in st.session_state.history:
+        st.sidebar.markdown(f"**You:** {chat['query']}")
+        st.sidebar.markdown(f"**Bot:** {chat['response']}")
+else:
+    st.sidebar.info("No queries yet. Try asking something!")

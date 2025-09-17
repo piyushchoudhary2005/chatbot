@@ -4,4 +4,6 @@ pandas
 numpy
 streamlit-chat
 matplotlib
+pyttsx3
 
+gTTS
