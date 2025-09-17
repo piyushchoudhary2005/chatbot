@@ -6,4 +6,4 @@ gTTS
 streamlit-webrtc
 SpeechRecognition
 numpy
-pyaudio  # Required by SpeechRecognition for microphone input
+
