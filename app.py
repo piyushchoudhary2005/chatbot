@@ -3,30 +3,8 @@ import random
 import matplotlib.pyplot as plt
 import pandas as pd
 import sys
-
-# --- TTS Setup ---
-try:
-    import pyttsx3
-    tts_mode = "local"
-except ImportError:
-    from gtts import gTTS
-    import os
-    tts_mode = "cloud"
-
-def speak(text):
-    if tts_mode == "local":
-        engine = pyttsx3.init()
-        engine.say(text)
-        engine.runAndWait()
-    else:
-        tts = gTTS(text=text, lang='en')
-        tts.save("temp.mp3")
-        if sys.platform.startswith("win"):
-            os.system("start temp.mp3")
-        elif sys.platform.startswith("linux"):
-            os.system("mpg321 temp.mp3")
-        elif sys.platform.startswith("darwin"):
-            os.system("afplay temp.mp3")
+from gtts import gTTS
+import io
 
 # --- Streamlit Page Setup ---
 st.set_page_config(page_title="🌊 Oceanographic AI Assistant", layout="wide")
@@ -36,6 +14,17 @@ if "history" not in st.session_state:
 
 st.title("🌊 Oceanographic AI Assistant")
 st.caption("Ask about **salinity**, **temperature**, or **ARGO floats** using text or voice input 🎤.")
+
+# --- Browser-safe TTS ---
+def speak(text):
+    """
+    Convert text to speech and play in browser using Streamlit audio
+    """
+    tts = gTTS(text=text, lang='en')
+    mp3_fp = io.BytesIO()
+    tts.write_to_fp(mp3_fp)
+    mp3_fp.seek(0)
+    st.audio(mp3_fp, format="audio/mp3")
 
 # --- Voice Input using microphone ---
 voice_query = None
@@ -84,9 +73,16 @@ def process_query(query):
 
     elif "float" in query.lower():
         st.subheader("🌍 ARGO Floats Near Your Region")
-        df = pd.DataFrame({"lat": [10.0, 12.5, 15.0], "lon": [72.0, 75.5, 78.0]})
-        st.map(df)
-        response = "Here are the nearby ARGO floats on the map."
+        # Mock map data
+        df = pd.DataFrame({
+            "lat": [10.0, 12.5, 15.0],
+            "lon": [72.0, 75.5, 78.0],
+            "ID": ["ARGO-001", "ARGO-002", "ARGO-003"],
+            "Region": ["Arabian Sea", "Arabian Sea", "Arabian Sea"]
+        })
+        st.map(df[["lat", "lon"]])
+        st.table(df[["ID", "Region"]])
+        response = "Here are the nearby ARGO floats on the map with IDs and regions."
         speak(response)
 
     else:
@@ -107,6 +103,7 @@ for chat in st.session_state.history:
     st.markdown(f"**You:** {chat['query']}")
     st.markdown(f"**Bot:** {chat['response']}")
     st.markdown("---")
+
 
 
 
