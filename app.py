@@ -34,49 +34,47 @@ st.set_page_config(page_title="🌊 Oceanographic AI Assistant", layout="wide")
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# --- Custom CSS for floating mic button ---
-st.markdown("""
-    <style>
-    .mic-button {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        background-color: #0078ff;
-        border-radius: 50%;
-        width: 70px;
-        height: 70px;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        cursor: pointer;
-        z-index: 9999;
-    }
-    .mic-button:hover { background-color: #0056b3; }
-    .mic-button i { color: white; font-size: 30px; line-height: 70px; }
-    </style>
-    <div class="mic-button" onclick="startRecognition()">
-        <i>🎤</i>
-    </div>
-    <script>
-    function startRecognition() {
-        var recognition = new webkitSpeechRecognition();
-        recognition.lang = "en-US";
-        recognition.onresult = function(event) {
-            var userSpeech = event.results[0][0].transcript;
-            var inputBox = window.parent.document.querySelector('input[type="text"]');
-            inputBox.value = userSpeech;
-            inputBox.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        recognition.start();
-    }
-    </script>
-""", unsafe_allow_html=True)
-
-# --- Title ---
 st.title("🌊 Oceanographic AI Assistant")
 st.caption("Ask about **salinity**, **temperature**, or **ARGO floats** using voice 🎤 or text ⌨️.")
 
+# --- Voice Input using streamlit-webrtc ---
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
+import speech_recognition as sr
+import numpy as np
+
+query_text = ""
+
+class AudioProcessor(AudioProcessorBase):
+    def __init__(self):
+        self.r = sr.Recognizer()
+        self.query = None
+
+    def recv(self, frame):
+        audio = frame.to_ndarray()
+        return frame
+
+def get_voice_input():
+    webrtc_ctx = webrtc_streamer(key="voice_input")
+    st.info("Click **Start** to record, speak your query, then stop.")
+    if webrtc_ctx.state.playing:
+        st.warning("Recording in progress...")
+    if st.button("Transcribe Last Recording"):
+        try:
+            r = sr.Recognizer()
+            with sr.Microphone() as source:
+                st.info("Listening for 5 seconds...")
+                audio_data = r.listen(source, timeout=5)
+                query = r.recognize_google(audio_data)
+                st.success(f"🎤 You said: {query}")
+                return query
+        except Exception as e:
+            st.error(f"Could not recognize speech: {e}")
+    return None
+
+voice_query = get_voice_input()
+
 # --- Text input fallback ---
-user_query = st.text_input("Type your query or click the 🎤 button:")
+user_query = st.text_input("Type your query or use voice input:", value=voice_query if voice_query else "")
 
 # --- Handle query ---
 def process_query(query):
